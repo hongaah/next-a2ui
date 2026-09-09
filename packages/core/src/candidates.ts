@@ -29,11 +29,11 @@ function coversLength(accepts: JsonSchema, range: readonly [number, number]): bo
 function isCompatible(accepts: JsonSchema, shape: ShapeDescriptor): boolean {
   switch (shape.kind) {
     case "array":
-      return (
-        accepts.type === "array" &&
-        coversLength(accepts, shape.lengthRange) &&
-        coversFields(accepts.items?.required ?? [], shape.fields)
-      );
+      if (accepts.type !== "array" || !coversLength(accepts, shape.lengthRange)) return false;
+      // 数组必定为空时，元素字段要求是空真：没有元素要渲染，就没有字段可缺。
+      // 空态组件的类型上照样标着元素形状，不能因此把它挡在空结果之外。
+      if (shape.lengthRange[1] === 0) return true;
+      return coversFields(accepts.items?.required ?? [], shape.fields);
     case "object":
       return accepts.type === "object" && coversFields(accepts.required ?? [], shape.fields);
     case "scalar":

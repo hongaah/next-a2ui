@@ -104,3 +104,32 @@ describe("candidates 数量约束", () => {
     expect(ids).toContain("MovieComparison");
   });
 });
+
+describe("candidates 空数组的空真语义", () => {
+  test("数组必定为空时，元素字段要求视为空真", () => {
+    // 空态组件的类型上仍标着元素形状，但空数组根本没有元素要渲染
+    const emptyState: ComponentContract = {
+      id: "EmptyState",
+      accepts: {
+        type: "array",
+        maxItems: 0,
+        items: { type: "object", required: ["id", "title"] },
+      },
+      emits: [{ name: "reset" }],
+      semantics: { use: "查询无结果时的空态", avoid: "" },
+      density: "compact",
+    };
+
+    const ids = candidates([emptyState], describeShape([])).map((c) => c.id);
+
+    expect(ids).toEqual(["EmptyState"]);
+  });
+
+  test("数组可能非空时，元素字段要求照常适用", () => {
+    const strict = listComponent("MovieCard", ["title", "poster"]);
+
+    const ids = candidates([strict], describeShape([{ id: 1, title: "M" }])).map((c) => c.id);
+
+    expect(ids).toEqual([]);
+  });
+});

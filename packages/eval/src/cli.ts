@@ -1,10 +1,10 @@
-import { movieCatalog } from "../fixtures/movie-catalog.ts";
+import { buildMovieCatalog } from "../fixtures/movie-catalog.ts";
 import { movieGoldSet } from "../fixtures/movie-gold-set.ts";
 import { runEval } from "./harness.ts";
 import { firstCandidateLLM } from "./scripted-llm.ts";
 
 const report = await runEval(movieGoldSet, {
-  catalog: movieCatalog,
+  catalog: buildMovieCatalog(),
   llm: firstCandidateLLM(),
 });
 

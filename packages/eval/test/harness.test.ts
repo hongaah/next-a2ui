@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { movieCatalog } from "../fixtures/movie-catalog.ts";
+import { buildMovieCatalog } from "../fixtures/movie-catalog.ts";
+
+const movieCatalog = buildMovieCatalog();
+
 import { type GoldCase, runEval } from "../src/harness.ts";
 import { firstCandidateLLM } from "../src/scripted-llm.ts";
 

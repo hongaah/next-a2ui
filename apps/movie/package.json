@@ -1,0 +1,17 @@
+{
+  "name": "@next-a2ui/movie",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "^19.2.0",
+    "@next-a2ui/contract": "workspace:*",
+    "@next-a2ui/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0"
+  },
+  "exports": {
+    "./src/*": "./src/*"
+  }
+}
