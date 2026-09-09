@@ -250,7 +250,7 @@ packages/runtime    <GenerativeSlot> · host bridge · 降级 UI
                     基于 CopilotKit + @a2ui/react
 ```
 
-拆出 `packages/contract` 与 `packages/llm` 的理由：契约抽取是构建期行为，LLM 调用是 I/O 边界，两者都不该混进编译器内核。core 因此可以在无网络、无浏览器的环境下完整跑测试与 eval——这是 §13.3 的 CI gate 能成立的前提。
+拆出 `packages/contract` 与 `packages/llm` 的理由：契约抽取是构建期行为，LLM 调用是 I/O 边界，两者都不该混进编译器内核。core 因此可以在无网络、无浏览器的环境下完整跑测试与 eval——这是 §13.4 的 CI gate 能成立的前提。
 
 ### 6.1 为什么基于 CopilotKit
 
@@ -459,7 +459,22 @@ MVP 必须能拿出硬数据，否则"低成本又快又准"不可证。
 
 **不引入依赖的**：singleflight（约 20 行）、bandit（MVP 不做）。
 
-### 13.3 eval 策略
+### 13.3 agent 框架：core 不用，demo 用两个
+
+**core / llm / adapter 不引入 LangChain / LangGraph。** core 是确定性管线加一次结构化输出调用，没有图、没有检查点、没有工具循环——LangGraph 的全部价值我们一样都用不上。更硬的理由是它会拖进 provider SDK 与网络 I/O，直接违反 §6.3，使 core 无法离线跑 eval，§13.4 的 CI gate 随之失效。L2 那一次调用的正确形状是 `generateObject`。
+
+**demo 侧刻意接两个不同的 agent**，顺序如下：
+
+1. 最小 TS tool-loop agent（AI SDK，几十行），先把 adapter 跑通
+2. 再接 LangGraph agent —— AG-UI 与 LangGraph 是一方集成（`CopilotKitMiddleware` 让 graph 直接说 AG-UI wire protocol）
+
+顺序不能反。核心主张是"能套在任何现成 agent 上，agent 零改动"，而证明它最有力的方式不是用某个框架，是**接两个完全不同的 agent 而 adapter 一行不改**。先上 LangGraph 会让我们不自觉地照着它的形状设计 adapter，"支持任何 agent"就成了空话。
+
+务实提示：AG-UI × LangGraph 的成熟路径目前是 Python 优先（`ag-ui-langgraph` 在 PyPI）。走 LangGraph JS 还是单起 Python agent 服务，留到第 2 步再定。
+
+未来 `flowContext` 那条线做流程编排时 LangGraph 确实合适，但那属于宿主 agent 的职责，仍不进 compiler。
+
+### 13.4 eval 策略
 
 遵循"从最便宜的工具开始"，但**高标准体现在流程而非框架**：
 
@@ -469,7 +484,7 @@ MVP 必须能拿出硬数据，否则"低成本又快又准"不可证。
 
 暂不引入 Evalite / promptfoo。等 case 数上百、多人并行跑 eval 时再接——那时接入成本仍然很低，而现在引入会把简单问题复杂化。
 
-### 13.4 代码标准（第一天即生效，不列为"以后补"）
+### 13.5 代码标准（第一天即生效，不列为"以后补"）
 
 - TS `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` + `verbatimModuleSyntax`
 - `packages/core` 关键路径（cacheKey 计算、候选集、降级链、singleflight）必须有测试
