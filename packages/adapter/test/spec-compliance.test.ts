@@ -72,7 +72,7 @@ describe("产出的消息符合 A2UI v1.0 官方 schema", () => {
       surfaceId: "slot-a",
       catalogId: "movie-web",
       data: [{ id: 1, title: "沙丘" }],
-      existingSurface: true,
+      existingTemplateId: "tpl",
     });
 
     const ok = validate(message);

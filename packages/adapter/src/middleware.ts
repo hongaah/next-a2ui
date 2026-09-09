@@ -32,7 +32,12 @@ export function createCompileMiddleware(options: {
   catalog: Catalog;
   surfaceIdFor: (toolCall: ToolCall) => string;
 }): { onToolResult(event: ToolResultEvent): Promise<GenerativeUIEvent> } {
-  const rendered = new Set<string>();
+  // 记录每个 slot 上当前渲染的是哪个模板。只看 surfaceId 不够——模板换了却
+  // 只发数据，客户端会拿旧组件树渲染新数据。
+  //
+  // 这份状态是**会话级**的：一个客户端连接对应一个中间件实例。页面重载会新建
+  // 连接、新建实例，因而重新发 createSurface，这正是我们要的。
+  const rendered = new Map<string, string>();
 
   return {
     async onToolResult(event: ToolResultEvent): Promise<GenerativeUIEvent> {
@@ -51,14 +56,16 @@ export function createCompileMiddleware(options: {
       });
 
       const surfaceId = options.surfaceIdFor(event.toolCall);
-      const existingSurface = rendered.has(surfaceId);
-      if (result.surface !== null) rendered.add(surfaceId);
+      const existingTemplateId = rendered.get(surfaceId) ?? null;
+      if (result.surface !== null && result.templateId !== null) {
+        rendered.set(surfaceId, result.templateId);
+      }
 
       return toGenerativeUIEvent(result, {
         surfaceId,
         catalogId: options.catalog.id,
         data: event.result,
-        existingSurface,
+        existingTemplateId,
       });
     },
   };

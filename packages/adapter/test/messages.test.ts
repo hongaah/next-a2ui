@@ -30,7 +30,7 @@ describe("toA2UIMessages 结构与数据分离", () => {
   test("命中缓存时只发 updateDataModel，不重发组件树", () => {
     const hit: CompileResult = { ...surface, source: "L0" };
 
-    const messages = toA2UIMessages(hit, { ...options, existingSurface: true });
+    const messages = toA2UIMessages(hit, { ...options, existingTemplateId: "tpl-1" });
 
     expect(messages).toHaveLength(1);
     expect(messages[0]).toHaveProperty("updateDataModel");

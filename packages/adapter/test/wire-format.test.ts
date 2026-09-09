@@ -39,7 +39,7 @@ describe("A2UI 线格式翻译", () => {
   });
 
   test("数据更新同样写到 /data，不覆盖整个根模型", () => {
-    const message = toA2UIMessages(result, { ...options, existingSurface: true })[0];
+    const message = toA2UIMessages(result, { ...options, existingTemplateId: "tpl" })[0];
 
     expect(message?.updateDataModel).toEqual({
       surfaceId: "slot-a",

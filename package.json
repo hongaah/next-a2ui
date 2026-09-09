@@ -13,7 +13,7 @@
     "format": "biome check --write .",
     "eval": "bun run packages/eval/src/cli.ts",
     "verify": "bun run typecheck && bun run lint && bun test && bun run eval",
-    "smoke": "bun run scripts/smoke.ts"
+    "smoke": "bun run scripts/smoke.tsx"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
@@ -23,6 +23,11 @@
   "dependencies": {
     "@next-a2ui/core": "workspace:*",
     "@next-a2ui/llm": "workspace:*",
-    "@next-a2ui/eval": "workspace:*"
+    "@next-a2ui/eval": "workspace:*",
+    "@next-a2ui/adapter": "workspace:*",
+    "@next-a2ui/runtime": "workspace:*",
+    "@next-a2ui/movie": "workspace:*",
+    "react-dom": "^19.2.0",
+    "react": "^19.2.0"
   }
 }

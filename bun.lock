@@ -5,9 +5,14 @@
     "": {
       "name": "next-a2ui",
       "dependencies": {
+        "@next-a2ui/adapter": "workspace:*",
         "@next-a2ui/core": "workspace:*",
         "@next-a2ui/eval": "workspace:*",
         "@next-a2ui/llm": "workspace:*",
+        "@next-a2ui/movie": "workspace:*",
+        "@next-a2ui/runtime": "workspace:*",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.5.12",

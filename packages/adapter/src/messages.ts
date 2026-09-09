@@ -6,8 +6,13 @@ export interface MessageOptions {
   readonly surfaceId: string;
   readonly catalogId: string;
   readonly data: unknown;
-  /** 该 slot 上已经渲染过一个 surface，只需换数据。 */
-  readonly existingSurface?: boolean;
+  /**
+   * 该 slot 上已有的模板 id。
+   * - 未提供：surface 还不存在，发 createSurface
+   * - 与本次相同：只发 updateDataModel
+   * - 与本次不同：模板换了，发 updateComponents + updateDataModel
+   */
+  readonly existingTemplateId?: string | null;
 }
 
 const VERSION = "v1.0";
@@ -83,28 +88,43 @@ function normalizeRoot(surface: SurfaceTemplate): A2UIComponent[] {
 export function toA2UIMessages(result: CompileResult, options: MessageOptions): A2UIMessage[] {
   if (result.surface === null) return [];
 
-  if (options.existingSurface === true) {
+  const dataMessage: A2UIMessage = {
+    version: VERSION,
+    updateDataModel: {
+      surfaceId: options.surfaceId,
+      path: `/${DATA_ROOT}`,
+      value: options.data,
+    },
+  };
+
+  const existing = options.existingTemplateId;
+  if (existing === undefined || existing === null) {
     return [
       {
         version: VERSION,
-        updateDataModel: {
+        createSurface: {
           surfaceId: options.surfaceId,
-          path: `/${DATA_ROOT}`,
-          value: options.data,
+          catalogId: options.catalogId,
+          components: normalizeRoot(result.surface).map(toWireComponent),
+          dataModel: { [DATA_ROOT]: options.data },
         },
       },
     ];
   }
 
+  if (existing === result.templateId) return [dataMessage];
+
+  // 模板换了。规范禁止对已存在的 surface 再发 createSurface
+  // （"It is an error to try to create a surface with an existing ID"），
+  // 必须走 updateComponents。
   return [
     {
       version: VERSION,
-      createSurface: {
+      updateComponents: {
         surfaceId: options.surfaceId,
-        catalogId: options.catalogId,
         components: normalizeRoot(result.surface).map(toWireComponent),
-        dataModel: { [DATA_ROOT]: options.data },
       },
     },
+    dataMessage,
   ];
 }
