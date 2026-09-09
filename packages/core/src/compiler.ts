@@ -7,8 +7,10 @@ import type { ComponentContract } from "./contract.ts";
 import { describeShape, type ShapeDescriptor, serializeShape } from "./data-shape.ts";
 import { Singleflight } from "./singleflight.ts";
 import type { SurfaceTemplate } from "./surface.ts";
+import { type CompileEvent, noopTelemetry, type TelemetrySink } from "./telemetry.ts";
 import { type ToolCall, toolSignature } from "./tool-signature.ts";
 import { type ValidationError, validateTemplate } from "./validate-template.ts";
+import type { VariantPool } from "./variant-pool.ts";
 
 export interface Catalog {
   readonly id: string;
@@ -77,28 +79,57 @@ type Outcome =
 export class Compiler {
   readonly #cache: CacheStore;
   readonly #llm: LLMClient;
+  readonly #telemetry: TelemetrySink;
+  readonly #variants: VariantPool | null;
   readonly #singleflight = new Singleflight();
 
-  constructor(options: { cache: CacheStore; llm: LLMClient }) {
+  constructor(options: {
+    cache: CacheStore;
+    llm: LLMClient;
+    telemetry?: TelemetrySink;
+    variants?: VariantPool;
+  }) {
     this.#cache = options.cache;
     this.#llm = options.llm;
+    this.#telemetry = options.telemetry ?? noopTelemetry;
+    this.#variants = options.variants ?? null;
   }
 
   async compile(request: CompileRequest): Promise<CompileResult> {
+    const startedAt = performance.now();
+    const variantId = request.variantId ?? "default";
     const shape = describeShape(request.data);
     const key = cacheKeyOf({
       toolSig: toolSignature(request.toolCall),
       dataShape: serializeShape(shape),
       intentClass: request.intentClass,
-      variantId: request.variantId ?? "default",
+      variantId,
       flowContext: request.flowContext ?? null,
       catalogId: request.catalog.id,
       catalogVersion: request.catalog.version,
     });
 
+    // 候选集大小只在走 L2 时才有意义——命中缓存的整个意义就是不去算它。
+    let componentCount = 0;
+    let actionCount = 0;
+    const emit = (result: CompileResult): CompileResult => {
+      const event: CompileEvent = {
+        cacheKey: key,
+        intentClass: request.intentClass,
+        variantId,
+        source: result.source,
+        componentCandidates: componentCount,
+        actionCandidates: actionCount,
+        durationMs: performance.now() - startedAt,
+        degraded: result.degraded?.stage ?? null,
+      };
+      this.#telemetry.compiled(event);
+      return result;
+    };
+
     const cached = await this.#cache.get(key);
     if (cached !== undefined) {
-      return this.#succeed(cached, request, "L0");
+      return emit(this.#succeed(cached, request, "L0"));
     }
 
     // 候选集必须先算：为空说明 catalog 既拿不下这份数据、也没有可驱动的动作，
@@ -106,10 +137,12 @@ export class Compiler {
     const availableArgs = Object.keys(request.toolCall.args);
     const componentMatches = candidates(request.catalog.components, shape);
     const actionMatches = actionCandidates(request.catalog.actions ?? [], availableArgs);
+    componentCount = componentMatches.length;
+    actionCount = actionMatches.length;
 
     // 组件无候选但动作有候选是 action-only 场景（阶梯 1），不是 gap。
     if (componentMatches.length === 0 && actionMatches.length === 0) {
-      return {
+      return emit({
         actions: [],
         surface: null,
         source: "gap",
@@ -121,7 +154,7 @@ export class Compiler {
           intentClass: request.intentClass,
         },
         degraded: null,
-      };
+      });
     }
 
     // 未命中走 L2，并在 singleflight 保护下编译：同一 key 的并发请求只付一次钱。
@@ -155,12 +188,23 @@ export class Compiler {
         const entry: CachedPlan = { templateId: key, template, actionPlans };
         // JIT 晋升：L2 产物回写 L0，下次同意图即 0 次模型调用。
         await this.#cache.set(key, entry);
+        // 变体入池，供宿主列出"同一意图的其它呈现"，也是 bandit 未来的候选集。
+        await this.#variants?.register(
+          {
+            toolCall: request.toolCall,
+            data: request.data,
+            intentClass: request.intentClass,
+            catalog: request.catalog,
+            flowContext: request.flowContext ?? null,
+          },
+          variantId,
+        );
         return { ok: true, entry };
       });
     } catch (error) {
       // compile 永不抛出：一个 slot 编译失败不能让宿主页面挂掉。
       // 失败不写缓存，所以下一次请求会自然重试。
-      return {
+      return emit({
         actions: [],
         surface: null,
         source: "fallback",
@@ -170,21 +214,21 @@ export class Compiler {
           stage: "compile-error",
           message: error instanceof Error ? error.message : String(error),
         },
-      };
+      });
     }
 
     if (!outcome.ok) {
-      return {
+      return emit({
         actions: [],
         surface: null,
         source: "fallback",
         templateId: null,
         capabilityGap: null,
         degraded: { stage: "validation", errors: outcome.errors },
-      };
+      });
     }
 
-    return this.#succeed(outcome.entry, request, "L2");
+    return emit(this.#succeed(outcome.entry, request, "L2"));
   }
 
   /**
