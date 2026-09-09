@@ -250,7 +250,7 @@ packages/runtime    <GenerativeSlot> · host bridge · 降级 UI
                     基于 CopilotKit + @a2ui/react
 ```
 
-拆出 `packages/contract` 与 `packages/llm` 的理由：契约抽取是构建期行为，LLM 调用是 I/O 边界，两者都不该混进编译器内核。core 因此可以在无网络、无浏览器的环境下完整跑测试与 eval——这是 §13.4 的 CI gate 能成立的前提。
+拆出 `packages/contract` 与 `packages/llm` 的理由：契约抽取是构建期行为，LLM 调用是 I/O 边界，两者都不该混进编译器内核。core 因此可以在无网络、无浏览器的环境下完整跑测试与 eval——这是 §13.5 的 CI gate 能成立的前提。
 
 ### 6.1 为什么基于 CopilotKit
 
@@ -459,9 +459,25 @@ MVP 必须能拿出硬数据，否则"低成本又快又准"不可证。
 
 **不引入依赖的**：singleflight（约 20 行）、bandit（MVP 不做）。
 
-### 13.3 agent 框架：core 不用，demo 用两个
+### 13.3 renderer：偏离「不重造」，自写薄 v1.0 渲染层
 
-**core / llm / adapter 不引入 LangChain / LangGraph。** core 是确定性管线加一次结构化输出调用，没有图、没有检查点、没有工具循环——LangGraph 的全部价值我们一样都用不上。更硬的理由是它会拖进 provider SDK 与网络 I/O，直接违反 §6.3，使 core 无法离线跑 eval，§13.4 的 CI gate 随之失效。L2 那一次调用的正确形状是 `generateObject`。
+§13.2 原本选定 `@a2ui/web_core` + `@a2ui/react`，理由是不重造 3000 行协议实现。落地时发现生态存在版本错位，因此偏离该决定：
+
+- A2UI 协议规范是 **v1.0**，`@a2ui/web_core` 内含 v1.0 schema
+- 但 **`@a2ui/react` 只到 v0_9**（包版本 0.11，顶层导出仍是 v0_8）
+- v0_9 的消息名是 `surfaceUpdate` / `beginRendering`，与 v1.0 的 `createSurface` / `updateComponents` 不是一套
+
+我们的 adapter 产出的是**经官方 schema 校验的 v1.0 消息**，现成 React renderer 读不懂。
+
+**决定**：runtime 自写一层薄的 v1.0 渲染层，协议保持 v1.0。
+
+理由：官方 renderer 的体量主要来自我们**刻意不生成**的能力——客户端函数、`checks` 校验、双向绑定、流式增量、模板容器。本项目的编译产物是浅的（单组件或浅嵌套、绑定已由契约推导、无函数无 checks），实际需要的只有 catalog 查表、属性绑定解析、事件回传三件事。为迁就落后版本而降级协议，代价大于自写这层。
+
+**边界**：这层只做渲染，不实现协议的其余部分。一旦官方 React renderer 跟上 v1.0，应当替换回去——渲染层因此必须与 `<GenerativeSlot>` 的宿主桥接严格分离，替换时只动渲染那一半。
+
+### 13.4 agent 框架：core 不用，demo 用两个
+
+**core / llm / adapter 不引入 LangChain / LangGraph。** core 是确定性管线加一次结构化输出调用，没有图、没有检查点、没有工具循环——LangGraph 的全部价值我们一样都用不上。更硬的理由是它会拖进 provider SDK 与网络 I/O，直接违反 §6.3，使 core 无法离线跑 eval，§13.5 的 CI gate 随之失效。L2 那一次调用的正确形状是 `generateObject`。
 
 **demo 侧刻意接两个不同的 agent**，顺序如下：
 
@@ -474,7 +490,7 @@ MVP 必须能拿出硬数据，否则"低成本又快又准"不可证。
 
 未来 `flowContext` 那条线做流程编排时 LangGraph 确实合适，但那属于宿主 agent 的职责，仍不进 compiler。
 
-### 13.4 eval 策略
+### 13.5 eval 策略
 
 遵循"从最便宜的工具开始"，但**高标准体现在流程而非框架**：
 
@@ -484,7 +500,7 @@ MVP 必须能拿出硬数据，否则"低成本又快又准"不可证。
 
 暂不引入 Evalite / promptfoo。等 case 数上百、多人并行跑 eval 时再接——那时接入成本仍然很低，而现在引入会把简单问题复杂化。
 
-### 13.5 代码标准（第一天即生效，不列为"以后补"）
+### 13.6 代码标准（第一天即生效，不列为"以后补"）
 
 - TS `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` + `verbatimModuleSyntax`
 - `packages/core` 关键路径（cacheKey 计算、候选集、降级链、singleflight）必须有测试
