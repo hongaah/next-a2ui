@@ -6,6 +6,7 @@ import { validateTemplate } from "../src/validate-template.ts";
 
 const movieRow: ComponentContract = {
   id: "MovieRow",
+  dataProp: "movies",
   accepts: { type: "array", items: { type: "object", required: ["title"] } },
   emits: [{ name: "select" }],
   semantics: { use: "以行列表展示影片", avoid: "" },

@@ -1,4 +1,4 @@
-import type { ActionContract, ComponentContract, ShapeDescriptor } from "@next-a2ui/core";
+import type { ActionContract, ComponentContract } from "@next-a2ui/core";
 import { z } from "zod";
 
 function nonEmptyEnum(values: readonly string[]): [string, ...string[]] {
@@ -8,35 +8,14 @@ function nonEmptyEnum(values: readonly string[]): [string, ...string[]] {
 }
 
 /**
- * 从数据形状枚举出全部合法的绑定路径。
- *
- * 数组用 A2UI 的子作用域（相对当前元素的裸字段名），对象用根作用域（/字段）。
- * 数组不枚举下标路径：列表该由组件自己迭代，模板写死 /0/title 是反模式。
- */
-function legalPaths(shape: ShapeDescriptor): string[] {
-  switch (shape.kind) {
-    case "array":
-      return ["/", ...shape.fields];
-    case "object":
-      return ["/", ...shape.fields.map((field) => `/${field}`)];
-    case "scalar":
-      return ["/"];
-  }
-}
-
-/**
  * 为一次 L2 编译构造受约束的输出 schema。
  *
  * 组件名是候选集的枚举而不是自由字符串——配合 provider 原生 strict mode，
  * 模型在 token 层面就无法产出 catalog 之外的组件。验证器仍然保留，但它从
  * "主要防线"降级成"断言不变式"：真跳出来说明实现有 bug，不是模型不听话。
  */
-export function buildSurfaceSchema(
-  candidates: readonly ComponentContract[],
-  shape: ShapeDescriptor,
-) {
+export function buildSurfaceSchema(candidates: readonly ComponentContract[]) {
   const componentNames = nonEmptyEnum(candidates.map((candidate) => candidate.id));
-  const paths = nonEmptyEnum(legalPaths(shape));
 
   // 刻意不让模型给 rootId：它引用的是模型在同一个对象里现编的 id，这种自引用
   // 约束 JSON Schema 表达不了，只能事后校验。拿掉它、由客户端从组件树推导，
@@ -48,10 +27,6 @@ export function buildSurfaceSchema(
           id: z.string().describe("本节点的唯一 id"),
           component: z.enum(componentNames).describe("只能从候选组件中选择"),
           children: z.array(z.string()).optional().describe("子节点 id 列表"),
-          bindings: z
-            .record(z.string(), z.object({ path: z.enum(paths) }))
-            .optional()
-            .describe("属性名到数据路径的绑定，路径只能取数据里真实存在的字段"),
         }),
       )
       .min(1),

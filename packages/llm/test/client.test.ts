@@ -6,6 +6,7 @@ import { createAISDKClient } from "../src/client.ts";
 
 const movieGrid: ComponentContract = {
   id: "MovieGrid",
+  dataProp: "movies",
   accepts: { type: "array", items: { type: "object", required: ["title", "poster"] } },
   emits: [{ name: "select" }],
   semantics: { use: "封面优先的影片网格，适合浏览与发现", avoid: "缺封面时不要用" },
@@ -29,7 +30,7 @@ describe("createAISDKClient composeSurface", () => {
   test("返回模型产出的模板", async () => {
     const client = createAISDKClient({
       model: modelReturning({
-        components: [{ id: "root", component: "MovieGrid", bindings: { items: { path: "/" } } }],
+        components: [{ id: "root", component: "MovieGrid", bindings: { movies: { path: "/" } } }],
       }),
     });
 
@@ -41,7 +42,7 @@ describe("createAISDKClient composeSurface", () => {
 
     expect(template).toEqual({
       rootId: "root",
-      components: [{ id: "root", component: "MovieGrid", bindings: { items: { path: "/" } } }],
+      components: [{ id: "root", component: "MovieGrid", bindings: { movies: { path: "/" } } }],
     });
   });
 });

@@ -6,6 +6,7 @@ import { describeShape } from "../src/data-shape.ts";
 function listComponent(id: string, required: string[]): ComponentContract {
   return {
     id,
+    dataProp: "movies",
     accepts: { type: "array", items: { type: "object", required } },
     emits: [{ name: "select" }],
     semantics: { use: `渲染 ${id}`, avoid: "" },
@@ -31,6 +32,7 @@ describe("candidates", () => {
 function detailComponent(id: string, required: string[]): ComponentContract {
   return {
     id,
+    dataProp: "movie",
     accepts: { type: "object", required },
     emits: [],
     semantics: { use: `渲染 ${id}`, avoid: "" },
@@ -64,6 +66,7 @@ describe("candidates 基数匹配", () => {
 describe("candidates 数量约束", () => {
   const emptyState: ComponentContract = {
     id: "EmptyState",
+    dataProp: "movies",
     accepts: { type: "array", maxItems: 0 },
     emits: [{ name: "reset" }],
     semantics: { use: "查询无结果时的空态", avoid: "有结果时不要用" },
@@ -71,6 +74,7 @@ describe("candidates 数量约束", () => {
   };
   const comparison: ComponentContract = {
     id: "MovieComparison",
+    dataProp: "movies",
     accepts: { type: "array", maxItems: 5, items: { type: "object", required: ["title"] } },
     emits: [],
     semantics: { use: "并排对比两三部影片", avoid: "超过 5 条不要用" },
@@ -110,6 +114,7 @@ describe("candidates 空数组的空真语义", () => {
     // 空态组件的类型上仍标着元素形状，但空数组根本没有元素要渲染
     const emptyState: ComponentContract = {
       id: "EmptyState",
+      dataProp: "movies",
       accepts: {
         type: "array",
         maxItems: 0,

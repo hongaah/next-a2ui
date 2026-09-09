@@ -175,6 +175,7 @@ export function extractContracts(options: {
 
     contracts.push({
       id: declaration.component,
+      dataProp: declaration.data,
       accepts,
       emits: emitsOf(propsParam.getType(), propsParam),
       semantics: declaration.semantics,

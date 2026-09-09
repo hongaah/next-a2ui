@@ -1,4 +1,10 @@
-import type { A2UIComponent, ActionPlan, LLMClient, SurfaceTemplate } from "@next-a2ui/core";
+import type {
+  A2UIComponent,
+  ActionPlan,
+  ComponentContract,
+  LLMClient,
+  SurfaceTemplate,
+} from "@next-a2ui/core";
 import { generateObject, type LanguageModel } from "ai";
 import { actionPrompt, surfacePrompt } from "./prompt.ts";
 import { buildActionPlanSchema, buildSurfaceSchema } from "./schema.ts";
@@ -16,6 +22,24 @@ function deriveRootId(components: readonly A2UIComponent[]): string {
 }
 
 /**
+ * 按契约推导数据绑定。
+ *
+ * 契约已经声明了哪个 prop 承载数据，绑定因此是确定的：整份数据接到那个 prop。
+ * 交给模型去选只会得到 `{ data: { path: "title" } }` 这种既不是真 prop 名、
+ * 又把数组绑到标量字段的产物。能算出来的就别问模型。
+ */
+function withDataBinding(
+  components: readonly A2UIComponent[],
+  candidates: readonly ComponentContract[],
+): A2UIComponent[] {
+  const dataProps = new Map(candidates.map((c) => [c.id, c.dataProp] as const));
+  return components.map((node) => {
+    const dataProp = dataProps.get(node.component);
+    return dataProp === undefined ? node : { ...node, bindings: { [dataProp]: { path: "/" } } };
+  });
+}
+
+/**
  * LLMClient 的 Vercel AI SDK 实现。
  *
  * 只用 AI SDK 的结构化生成与 provider 抽象，不碰它的 generative UI——那是竞品面。
@@ -26,10 +50,13 @@ export function createAISDKClient(options: { model: LanguageModel }): LLMClient 
     async composeSurface(input): Promise<SurfaceTemplate> {
       const { object } = await generateObject({
         model: options.model,
-        schema: buildSurfaceSchema(input.candidates, input.shape),
+        schema: buildSurfaceSchema(input.candidates),
         prompt: surfacePrompt(input),
       });
-      const components = object.components as readonly A2UIComponent[];
+      const components = withDataBinding(
+        object.components as readonly A2UIComponent[],
+        input.candidates,
+      );
       return { rootId: deriveRootId(components), components };
     },
 

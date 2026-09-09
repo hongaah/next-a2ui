@@ -158,6 +158,7 @@ describe("extractContracts 组件声明形式", () => {
     expect(result.errors).toEqual([]);
     expect(result.contracts[0]).toMatchObject({
       id: "MovieDetail",
+      dataProp: "movie",
       accepts: { type: "object", required: ["id", "poster", "title"] },
       emits: [{ name: "play" }],
     });

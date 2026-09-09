@@ -7,6 +7,7 @@ import { buildSurfaceSchema } from "../src/schema.ts";
 
 const contract = (id: string): ComponentContract => ({
   id,
+  dataProp: "movies",
   accepts: { type: "array", items: { type: "object", required: ["title"] } },
   emits: [],
   semantics: { use: id, avoid: "" },
@@ -29,7 +30,7 @@ function modelReturning(payload: unknown) {
 
 describe("rootId 不由模型给出", () => {
   test("schema 里没有 rootId 字段", () => {
-    const shapeOfSchema = buildSurfaceSchema(candidates, shape);
+    const shapeOfSchema = buildSurfaceSchema(candidates);
 
     const result = shapeOfSchema.safeParse({
       components: [{ id: "a", component: "MovieGrid" }],

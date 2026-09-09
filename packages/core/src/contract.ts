@@ -21,6 +21,13 @@ export interface SemanticEvent {
  */
 export interface ComponentContract {
   readonly id: string;
+  /**
+   * 承载数据的 prop 名。
+   *
+   * 有了它，数据绑定就是确定的（把整份数据接到这个 prop 上），不必交给模型
+   * 去猜——能算出来的就别问模型。
+   */
+  readonly dataProp: string;
   /** 数据契约：能渲染什么形状的数据。驱动候选集计算。 */
   readonly accepts: JsonSchema;
   /** 语义事件，非 DOM 事件。 */
