@@ -1,5 +1,6 @@
 export { type ActionPartition, partitionActions } from "./action-policy.ts";
 export { createRegistry } from "./create-registry.ts";
+export { type ActionMessage, buildActionMessage } from "./dispatch.ts";
 export { GenerativeSlot, type GenerativeSlotProps } from "./generative-slot.tsx";
 export { resolveProps } from "./resolve-props.ts";
 export { type ResolvedSurface, SurfaceStore, type WireComponent } from "./surface-store.ts";

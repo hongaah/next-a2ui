@@ -1,8 +1,4 @@
-export type {
-  ActionContract,
-  ActionInvocation,
-  ActionPlan,
-} from "./action.ts";
+export type { ActionContract, ActionInvocation, ActionPlan } from "./action.ts";
 export { bindActionPlan } from "./bind-action.ts";
 export {
   type BaseCacheKeyInput,
@@ -25,9 +21,17 @@ export {
   type PlanActionsInput,
 } from "./compiler.ts";
 export type { ComponentContract, JsonSchema, SemanticEvent } from "./contract.ts";
-export { dataShape, describeShape, type ShapeDescriptor, serializeShape } from "./data-shape.ts";
+export {
+  dataShape,
+  describeShape,
+  LENGTH_BUCKETS,
+  type ShapeDescriptor,
+  serializeShape,
+  VALID_MAX_ITEMS,
+  VALID_MIN_ITEMS,
+} from "./data-shape.ts";
 export { Singleflight } from "./singleflight.ts";
-export type { A2UIComponent, SurfaceTemplate } from "./surface.ts";
+export type { A2UIComponent, ComponentAction, SurfaceTemplate } from "./surface.ts";
 export {
   type CompileEvent,
   type InteractionEvent,

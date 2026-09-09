@@ -15,16 +15,23 @@ export interface IntentResult {
 
 const INTENT_SCHEMA = z.object({
   intentClass: z
-    .enum(["browse", "detail", "compare", "filter", "confirm", "edit", "explain"])
-    .describe("这次请求属于哪一类界面意图"),
+    .enum(["browse", "detail", "compare", "filter", "act", "confirm", "edit", "explain"])
+    .describe(
+      [
+        "界面意图：",
+        "browse=浏览发现；detail=只想了解某一项的信息；compare=并排对比；",
+        "filter=筛选后看结果；act=想执行操作（播放/打开/加入/删除）而不只是查看；",
+        "confirm=确认操作；edit=修改数据；explain=解释说明",
+      ].join(""),
+    ),
 });
 
 function describeData(shape: ShapeDescriptor): string {
   switch (shape.kind) {
     case "array":
-      return `数组，长度区间 ${shape.lengthBucket}，元素字段：${shape.fields.join("、") || "（无）"}`;
+      return `${shape.lengthBucket} 条列表`;
     case "object":
-      return `单个对象，字段：${shape.fields.join("、") || "（无）"}`;
+      return "单个对象";
     case "scalar":
       return `${shape.type} 标量`;
   }
@@ -51,16 +58,20 @@ export function createIntentClassifier(options: { model: LanguageModel; fallback
         const { object } = await generateObject({
           model: options.model,
           schema: INTENT_SCHEMA,
+          // 这是唯一每个请求都要跑的模型调用，提示长度直接决定它的延迟——但
+          // 压过头会让分类不稳定，而**不稳定比慢更糟**：它同时让缓存碎片化和
+          // 动作选错。类别语义必须写在正文里，数据描述可以压到最短。
           prompt: [
-            "判断用户这次请求想要什么样的界面。只输出类别，不要解释。",
-            "",
             `用户说：${input.userQuery}`,
-            `应用调用了：${input.toolCall.name}(${Object.keys(input.toolCall.args).join(", ")})`,
-            `返回数据：${describeData(input.shape)}`,
+            `应用调用：${input.toolCall.name}(${Object.keys(input.toolCall.args).join(",")}) → ${describeData(input.shape)}`,
             "",
-            "类别含义：",
-            "browse 浏览发现 · detail 查看单项详情 · compare 并排对比",
-            "filter 筛选后看结果 · confirm 确认操作 · edit 修改数据 · explain 解释说明",
+            "判断用户想要什么样的界面，只输出类别：",
+            "act — 想执行操作（播放、打开、加入、删除）。用户说「放」「看」「播」时属于这类",
+            "detail — 只想了解某一项的信息，没有执行意向",
+            "browse — 泛泛浏览发现",
+            "filter — 按条件筛选后看结果",
+            "compare — 并排对比多项",
+            "confirm — 确认某个操作 · edit — 修改数据 · explain — 解释说明",
           ].join("\n"),
         });
         return { intentClass: object.intentClass, degraded: false };

@@ -36,10 +36,14 @@ function toWirePath(path: string): string {
  * 规范的 unevaluatedProperties 会直接拒收它。
  */
 function toWireComponent(node: A2UIComponent): Record<string, unknown> {
-  const { bindings, ...rest } = node;
+  const { bindings, actions, ...rest } = node;
   const inlined: Record<string, unknown> = { ...rest };
   for (const [prop, binding] of Object.entries(bindings ?? {})) {
     inlined[prop] = { path: toWirePath(binding.path) };
+  }
+  // 交互声明与绑定在线格式里是同一层的普通属性
+  for (const [prop, action] of Object.entries(actions ?? {})) {
+    inlined[prop] = action;
   }
   return inlined;
 }

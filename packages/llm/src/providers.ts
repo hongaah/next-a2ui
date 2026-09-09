@@ -16,6 +16,8 @@ export interface ModelTiers {
   readonly small: LanguageModel;
   /** 低频大任务：L2 编译。只在缓存未命中时被叫醒。 */
   readonly large: LanguageModel;
+  /** 展示用的模型名，供追踪把「哪一步用了哪个模型」摊开给人看。 */
+  readonly labels: { readonly small: string; readonly large: string };
 }
 
 export interface TierConfig {
@@ -56,9 +58,13 @@ export function createModelTiers(config: TierConfig = {}): ModelTiers {
     supportsStructuredOutputs: true,
   });
 
+  const smallModel = config.smallModel ?? DEFAULTS.smallModel;
+  const largeModel = config.largeModel ?? DEFAULTS.largeModel;
+
   return {
-    small: smallProvider(config.smallModel ?? DEFAULTS.smallModel),
-    large: largeProvider(config.largeModel ?? DEFAULTS.largeModel),
+    small: smallProvider(smallModel),
+    large: largeProvider(largeModel),
+    labels: { small: `${smallModel} · 本地`, large: `${largeModel} · 网关` },
   };
 }
 

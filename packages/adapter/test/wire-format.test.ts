@@ -66,3 +66,33 @@ describe("A2UI 线格式翻译", () => {
     expect(created.components[0]?.label).toEqual({ path: "title" });
   });
 });
+
+describe("交互声明的线格式", () => {
+  test("actions 内联成组件属性，与绑定同一层", () => {
+    const withActions: CompileResult = {
+      ...result,
+      surface: {
+        rootId: "root",
+        components: [
+          {
+            id: "root",
+            component: "MovieList",
+            bindings: { movies: { path: "/" } },
+            actions: { play: { event: { name: "play" } } },
+          },
+        ],
+      },
+    };
+
+    const created = toA2UIMessages(withActions, options)[0]?.createSurface as {
+      components: Array<Record<string, unknown>>;
+    };
+
+    expect(created.components[0]).toEqual({
+      id: "root",
+      component: "MovieList",
+      movies: { path: "/data" },
+      play: { event: { name: "play" } },
+    });
+  });
+});

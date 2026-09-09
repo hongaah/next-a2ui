@@ -1,6 +1,7 @@
 import type {
   A2UIComponent,
   ActionPlan,
+  ComponentAction,
   ComponentContract,
   LLMClient,
   SurfaceTemplate,
@@ -32,10 +33,23 @@ function withDataBinding(
   components: readonly A2UIComponent[],
   candidates: readonly ComponentContract[],
 ): A2UIComponent[] {
-  const dataProps = new Map(candidates.map((c) => [c.id, c.dataProp] as const));
+  const contracts = new Map(candidates.map((c) => [c.id, c] as const));
   return components.map((node) => {
-    const dataProp = dataProps.get(node.component);
-    return dataProp === undefined ? node : { ...node, bindings: { [dataProp]: { path: "/" } } };
+    const contract = contracts.get(node.component);
+    if (contract === undefined) return node;
+
+    // 交互声明同样由契约推导：契约的每个 emits 就是一个可派发给 agent 的事件。
+    // 这是 A2UI 的回路起点——用户点了卡片，事件要回到 agent，agent 再给出新界面。
+    const actions: Record<string, ComponentAction> = {};
+    for (const emit of contract.emits) {
+      actions[emit.name] = { event: { name: emit.name } };
+    }
+
+    return {
+      ...node,
+      bindings: { [contract.dataProp]: { path: "/" } },
+      ...(contract.emits.length === 0 ? {} : { actions }),
+    };
   });
 }
 

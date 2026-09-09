@@ -43,7 +43,7 @@ const toolResult = (data: unknown) => ({
 
 describe("createCompileMiddleware", () => {
   test("首次在某个 slot 上编译时发出 createSurface", async () => {
-    const event = await middleware().onToolResult(toolResult([{ id: 1, title: "沙丘" }]));
+    const { event } = await middleware().onToolResult(toolResult([{ id: 1, title: "沙丘" }]));
 
     expect(event.value.messages[0]).toHaveProperty("createSurface");
   });
@@ -52,7 +52,7 @@ describe("createCompileMiddleware", () => {
     const mw = middleware();
 
     await mw.onToolResult(toolResult([{ id: 1, title: "沙丘" }]));
-    const second = await mw.onToolResult(toolResult([{ id: 2, title: "沙丘 2" }]));
+    const { event: second } = await mw.onToolResult(toolResult([{ id: 2, title: "沙丘 2" }]));
 
     expect(second.value.messages[0]).toHaveProperty("updateDataModel");
     expect(second.value.messages[0]).not.toHaveProperty("createSurface");
@@ -94,7 +94,7 @@ describe("中间件的模板变更处理", () => {
     });
 
     await mw.onToolResult(toolResult([{ id: 1, title: "沙丘" }]));
-    const second = await mw.onToolResult(toolResult([{ id: 2, title: "沙丘 2" }]));
+    const { event: second } = await mw.onToolResult(toolResult([{ id: 2, title: "沙丘 2" }]));
 
     expect(Object.keys(second.value.messages[0] ?? {})).toContain("updateDataModel");
   });
@@ -109,7 +109,7 @@ describe("中间件的模板变更处理", () => {
 
     await mw.onToolResult(toolResult([{ id: 1, title: "沙丘" }]));
     // 空结果 → 候选集只剩空态组件 → 模板变了
-    const changed = await mw.onToolResult(toolResult([]));
+    const { event: changed } = await mw.onToolResult(toolResult([]));
 
     const keys = changed.value.messages.flatMap((m) =>
       Object.keys(m).filter((k) => k !== "version"),

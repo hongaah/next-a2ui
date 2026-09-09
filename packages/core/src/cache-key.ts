@@ -3,6 +3,14 @@ export type IntentClass =
   | "detail"
   | "compare"
   | "filter"
+  /**
+   * 用户想**执行一个操作**，而不是查看信息。
+   *
+   * 这一类不能并进 detail：「放《X》」和「《X》讲什么」的 tool 签名与数据形状
+   * 完全相同，若意图也相同，缓存键就区分不了它们——而它们需要不同的动作。
+   * 意图类目必须细到能区分实质不同的结果。
+   */
+  | "act"
   | "confirm"
   | "edit"
   | "explain";

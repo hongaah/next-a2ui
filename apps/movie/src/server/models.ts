@@ -5,3 +5,6 @@ import { createModelTiersFromEnv } from "@next-a2ui/llm";
  * 走网关上的大模型。把高频的那档放本地，成本曲线才压得下去。
  */
 export const tiers = createModelTiersFromEnv(process.env);
+
+/** 展示用的模型名。 */
+export const modelLabels = tiers.labels;

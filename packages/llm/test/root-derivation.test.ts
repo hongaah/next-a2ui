@@ -14,7 +14,8 @@ const contract = (id: string): ComponentContract => ({
   density: "normal",
 });
 
-const candidates = [contract("MovieGrid"), contract("MovieList")];
+// 有嵌套就必须有容器：没有容器组件时 schema 不含 children，模型无从嵌套
+const candidates = [{ ...contract("MovieGrid"), acceptsChildren: true }, contract("MovieList")];
 const shape = describeShape([{ id: 1, title: "沙丘" }]);
 
 function modelReturning(payload: unknown) {

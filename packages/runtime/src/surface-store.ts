@@ -6,6 +6,7 @@ export interface WireComponent {
 }
 
 export interface ResolvedSurface {
+  readonly surfaceId: string;
   readonly catalogId: string;
   readonly components: ReadonlyMap<string, WireComponent>;
   readonly dataModel: unknown;
@@ -54,6 +55,7 @@ export class SurfaceStore {
     if (isRecord(created)) {
       const surfaceId = String(created.surfaceId);
       this.#surfaces.set(surfaceId, {
+        surfaceId,
         catalogId: String(created.catalogId ?? ""),
         components: indexComponents((created.components ?? []) as WireComponent[]),
         dataModel: created.dataModel ?? {},

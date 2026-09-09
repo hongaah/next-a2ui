@@ -42,7 +42,14 @@ describe("createAISDKClient composeSurface", () => {
 
     expect(template).toEqual({
       rootId: "root",
-      components: [{ id: "root", component: "MovieGrid", bindings: { movies: { path: "/" } } }],
+      components: [
+        {
+          id: "root",
+          component: "MovieGrid",
+          bindings: { movies: { path: "/" } },
+          actions: { select: { event: { name: "select" } } },
+        },
+      ],
     });
   });
 });

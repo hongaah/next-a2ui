@@ -32,6 +32,13 @@ export interface ComponentContract {
   readonly accepts: JsonSchema;
   /** 语义事件，非 DOM 事件。 */
   readonly emits: readonly SemanticEvent[];
+  /**
+   * 是否是容器组件（能接子节点）。
+   *
+   * catalog 里没有容器时，编译 schema 就不该含 children——模型没有可填的地方，
+   * 也就编不出指向不存在节点的子引用。模型的输出面越小越准。
+   */
+  readonly acceptsChildren?: boolean;
   /** 给模型看的，决定候选集内部的排序质量。系统准确率的上限就在这里。 */
   readonly semantics: { readonly use: string; readonly avoid: string };
   readonly density: "compact" | "normal" | "rich";

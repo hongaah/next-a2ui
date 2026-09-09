@@ -13,7 +13,7 @@ export type ShapeDescriptor =
  * 长度分桶。基数是 UI 结构的强信号——空态、单条、短列表、长列表是四种不同的界面——
  * 但精确长度不是：11 条和 12 条必须共用同一个缓存条目，否则命中率会崩。
  */
-const BUCKETS: ReadonlyArray<{ label: string; range: readonly [number, number] }> = [
+export const LENGTH_BUCKETS: ReadonlyArray<{ label: string; range: readonly [number, number] }> = [
   { label: "0", range: [0, 0] },
   { label: "1", range: [1, 1] },
   { label: "2-5", range: [2, 5] },
@@ -23,10 +23,10 @@ const BUCKETS: ReadonlyArray<{ label: string; range: readonly [number, number] }
 ];
 
 function lengthBucket(length: number): { label: string; range: readonly [number, number] } {
-  for (const bucket of BUCKETS) {
+  for (const bucket of LENGTH_BUCKETS) {
     if (length <= bucket.range[1]) return bucket;
   }
-  // BUCKETS 最后一档上界是 Infinity，循环必定命中
+  // LENGTH_BUCKETS 最后一档上界是 Infinity，循环必定命中
   throw new Error(`无法为长度 ${length} 分桶`);
 }
 
@@ -93,3 +93,15 @@ export function serializeShape(shape: ShapeDescriptor): string {
 export function dataShape(value: unknown): string {
   return serializeShape(describeShape(value));
 }
+
+/**
+ * 数量约束只能取分桶的边界值。
+ *
+ * 候选集用「约束必须完整覆盖数据所在分桶」来判定，因此一个不落在边界上的
+ * 阈值（比如 minItems: 3 落在 2-5 桶中间）永远无法被满足——组件会静默地
+ * 从所有候选集里消失。抽取器据此在构建期报错，而不是让它悄悄失配。
+ */
+export const VALID_MIN_ITEMS: readonly number[] = LENGTH_BUCKETS.map((b) => b.range[0]);
+export const VALID_MAX_ITEMS: readonly number[] = LENGTH_BUCKETS.map((b) => b.range[1]).filter(
+  (value) => Number.isFinite(value),
+);

@@ -2,6 +2,7 @@ import type { GenerativeUIEvent } from "@next-a2ui/adapter";
 import type { ActionInvocation, InteractionEvent } from "@next-a2ui/core";
 import { type ReactElement, type ReactNode, useEffect, useMemo, useRef } from "react";
 import { partitionActions } from "./action-policy.ts";
+import type { ActionMessage } from "./dispatch.ts";
 import { SurfaceStore } from "./surface-store.ts";
 import { A2UISurfaceView, type ComponentRegistry, type SurfaceEvent } from "./surface-view.tsx";
 
@@ -14,6 +15,8 @@ export interface GenerativeSlotProps {
   readonly classic?: boolean;
   /** 生成界面里的语义事件回传宿主。 */
   readonly onEvent?: (event: SurfaceEvent) => void;
+  /** A2UI 回路：用户在生成界面上的交互，作为规范消息回传给 agent。 */
+  readonly onDispatch?: (message: ActionMessage) => void;
   /** 可逆动作，自动派发给宿主执行。 */
   readonly onAction?: (action: ActionInvocation) => void;
   /** 不可逆动作，交给宿主去向用户确认，绝不自动执行。 */
@@ -37,6 +40,7 @@ export function GenerativeSlot({
   fallback,
   classic = false,
   onEvent,
+  onDispatch,
   onAction,
   onConfirmAction,
   onInteraction,
@@ -68,5 +72,12 @@ export function GenerativeSlot({
 
   if (!rendering) return <>{fallback}</>;
 
-  return <A2UISurfaceView surface={surface} registry={registry} {...(onEvent && { onEvent })} />;
+  return (
+    <A2UISurfaceView
+      surface={surface}
+      registry={registry}
+      {...(onEvent && { onEvent })}
+      {...(onDispatch && { onDispatch })}
+    />
+  );
 }

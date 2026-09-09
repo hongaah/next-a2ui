@@ -1,4 +1,5 @@
 import type { ComponentContract, JsonSchema, SemanticEvent } from "@next-a2ui/core";
+import { VALID_MAX_ITEMS, VALID_MIN_ITEMS } from "@next-a2ui/core";
 import {
   type ArrowFunction,
   type FunctionDeclaration,
@@ -16,6 +17,8 @@ export interface ContractDeclaration {
   readonly data: string;
   readonly semantics: { readonly use: string; readonly avoid: string };
   readonly density: "compact" | "normal" | "rich";
+  /** 是否是容器组件（能接子节点）。 */
+  readonly acceptsChildren?: boolean;
   /**
    * 数量约束。TS 类型表达不了"这个组件只接空列表"或"最多五条"，
    * 但候选集必须知道——否则空态组件会匹配上有内容的列表。
@@ -29,7 +32,8 @@ export interface ExtractionError {
     | "component-not-found"
     | "data-prop-not-found"
     | "unsupported-data-type"
-    | "cardinality-on-non-array";
+    | "cardinality-on-non-array"
+    | "cardinality-not-aligned";
   readonly detail: string;
 }
 
@@ -39,6 +43,35 @@ export interface ExtractionResult {
 }
 
 type ComponentFunction = FunctionDeclaration | ArrowFunction | FunctionExpression;
+
+/**
+ * 数量约束必须落在长度分桶的边界上。
+ *
+ * 候选集判定要求「约束完整覆盖数据所在分桶」，所以一个落在桶中间的阈值
+ * （minItems: 3 在 2-5 桶里）永远无法被满足——组件会从所有候选集里静默消失。
+ * 这类失配极难排查，必须在构建期就拦下来。
+ */
+function cardinalityError(
+  component: string,
+  cardinality: { readonly min?: number; readonly max?: number },
+): ExtractionError | null {
+  const { min, max } = cardinality;
+  if (min !== undefined && !VALID_MIN_ITEMS.includes(min)) {
+    return {
+      component,
+      kind: "cardinality-not-aligned",
+      detail: `min=${min} 不在分桶边界上，可用值：${VALID_MIN_ITEMS.join("、")}`,
+    };
+  }
+  if (max !== undefined && !VALID_MAX_ITEMS.includes(max)) {
+    return {
+      component,
+      kind: "cardinality-not-aligned",
+      detail: `max=${max} 不在分桶边界上，可用值：${VALID_MAX_ITEMS.join("、")}`,
+    };
+  }
+  return null;
+}
 
 /** React 里 `function X()` 与 `const X = () => {}` 都常见，两种都要认。 */
 function findComponent(project: Project, name: string): ComponentFunction | undefined {
@@ -141,6 +174,14 @@ export function extractContracts(options: {
       continue;
     }
 
+    if (declaration.cardinality !== undefined) {
+      const misaligned = cardinalityError(declaration.component, declaration.cardinality);
+      if (misaligned !== null) {
+        errors.push(misaligned);
+        continue;
+      }
+    }
+
     const derived = toSchema(dataProp.getTypeAtLocation(propsParam), propsParam);
     if (derived !== null && declaration.cardinality !== undefined && derived.type !== "array") {
       errors.push({
@@ -180,6 +221,9 @@ export function extractContracts(options: {
       emits: emitsOf(propsParam.getType(), propsParam),
       semantics: declaration.semantics,
       density: declaration.density,
+      ...(declaration.acceptsChildren === undefined
+        ? {}
+        : { acceptsChildren: declaration.acceptsChildren }),
     });
   }
 

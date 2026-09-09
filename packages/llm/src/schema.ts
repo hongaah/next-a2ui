@@ -16,6 +16,7 @@ function nonEmptyEnum(values: readonly string[]): [string, ...string[]] {
  */
 export function buildSurfaceSchema(candidates: readonly ComponentContract[]) {
   const componentNames = nonEmptyEnum(candidates.map((candidate) => candidate.id));
+  const hasContainer = candidates.some((candidate) => candidate.acceptsChildren === true);
 
   // 刻意不让模型给 rootId：它引用的是模型在同一个对象里现编的 id，这种自引用
   // 约束 JSON Schema 表达不了，只能事后校验。拿掉它、由客户端从组件树推导，
@@ -26,7 +27,11 @@ export function buildSurfaceSchema(candidates: readonly ComponentContract[]) {
         z.object({
           id: z.string().describe("本节点的唯一 id"),
           component: z.enum(componentNames).describe("只能从候选组件中选择"),
-          children: z.array(z.string()).optional().describe("子节点 id 列表"),
+          // catalog 里没有容器组件时干脆不给这个字段：模型没处可填，
+          // 也就编不出指向不存在节点的子引用。这类错误因此不可表达。
+          ...(hasContainer
+            ? { children: z.array(z.string()).optional().describe("子节点 id 列表") }
+            : {}),
         }),
       )
       .min(1),

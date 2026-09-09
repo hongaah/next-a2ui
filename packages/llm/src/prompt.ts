@@ -10,6 +10,7 @@ const INTENT_LABEL: Record<IntentClass, string> = {
   detail: "查看单项详情",
   compare: "并排对比",
   filter: "筛选后查看结果",
+  act: "执行一个操作（而不只是查看）",
   confirm: "确认一个操作",
   edit: "修改数据",
   explain: "解释说明",
@@ -80,6 +81,7 @@ export function actionPrompt(input: {
     "",
     "要求：",
     "- 只在动作确实能推进用户意图时才用，宁可返回空列表",
+    "- 通常只给一个最贴合的动作。语义重叠的动作不要同时给",
     "- 参数取值不由你决定，你只需说明每个参数取自哪个实参",
   ].join("\n");
 }

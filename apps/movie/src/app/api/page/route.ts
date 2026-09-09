@@ -20,7 +20,7 @@ export async function POST(): Promise<Response> {
   const regions = await Promise.all(
     REGIONS.map(async (region) => {
       const result = getMovies(region.args);
-      const event: GenerativeUIEvent = await middleware.onToolResult({
+      const { event }: { event: GenerativeUIEvent } = await middleware.onToolResult({
         userQuery: region.query,
         toolCall: { name: "getMovies", args: region.args },
         result,

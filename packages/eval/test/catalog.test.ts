@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { buildMovieCatalog } from "../fixtures/movie-catalog.ts";
 
 describe("从真实组件源码推导影视 catalog", () => {
-  test("五个组件都抽取成功且无漂移", () => {
+  test("全部组件抽取成功且无漂移", () => {
     const catalog = buildMovieCatalog();
 
     expect(catalog.components.map((component) => component.id)).toEqual([
       "MovieGrid",
       "MovieList",
+      "MovieCarousel",
+      "MovieSpotlight",
       "MovieComparison",
       "MovieDetail",
       "EmptyState",
@@ -19,9 +21,9 @@ describe("从真实组件源码推导影视 catalog", () => {
 
     expect(grid?.accepts).toEqual({
       type: "array",
-      minItems: 1,
-      items: { type: "object", required: ["id", "poster", "title"] },
+      minItems: 2,
+      items: { type: "object", required: ["id", "poster", "rating", "title", "year"] },
     });
-    expect(grid?.emits).toEqual([{ name: "select" }]);
+    expect(grid?.emits).toEqual([{ name: "play" }, { name: "select" }]);
   });
 });

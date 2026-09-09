@@ -34,3 +34,34 @@ describe("buildSurfaceSchema 组件约束", () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe("buildSurfaceSchema 子节点约束", () => {
+  test("没有容器组件时，schema 里不含 children —— 模型无从编造子节点", () => {
+    const result = buildSurfaceSchema([movieGrid]).safeParse({
+      components: [{ id: "a", component: "MovieGrid", children: ["ghost"] }],
+    });
+
+    // children 被剥掉而不是报错：多余属性不该让整次编译失败
+    expect(result.success).toBe(true);
+    expect((result.data as { components: Array<Record<string, unknown>> }).components[0]).toEqual({
+      id: "a",
+      component: "MovieGrid",
+    });
+  });
+
+  test("存在容器组件时，schema 允许 children", () => {
+    const container: ComponentContract = { ...movieGrid, id: "Section", acceptsChildren: true };
+
+    const result = buildSurfaceSchema([container, movieGrid]).safeParse({
+      components: [
+        { id: "a", component: "Section", children: ["b"] },
+        { id: "b", component: "MovieGrid" },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(
+      (result.data as { components: Array<{ children?: string[] }> }).components[0]?.children,
+    ).toEqual(["b"]);
+  });
+});

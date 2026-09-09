@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { getMovies } from "@next-a2ui/movie/src/data/movies.ts";
 import { buildMovieCatalog } from "../fixtures/movie-catalog.ts";
 
 const movieCatalog = buildMovieCatalog();
@@ -6,13 +7,8 @@ const movieCatalog = buildMovieCatalog();
 import { type GoldCase, runEval } from "../src/harness.ts";
 import { firstCandidateLLM } from "../src/scripted-llm.ts";
 
-const movies = (n: number) =>
-  Array.from({ length: n }, (_, i) => ({
-    id: i,
-    title: `M${i}`,
-    poster: "p.jpg",
-    rating: 8,
-  }));
+// 用宿主 app 的真实数据：合成数据会漏字段，让评测衡量一个不存在的世界
+const movies = (n: number) => getMovies().slice(0, n);
 
 describe("runEval", () => {
   test("同一意图重复出现时，命中率反映缓存复用", async () => {
@@ -66,7 +62,8 @@ describe("runEval 结构断言", () => {
       {
         name: "带封面的浏览",
         toolCall: { name: "getMovies", args: { genre: "sci-fi" } },
-        data: [{ id: 1, title: "M1", poster: "p.jpg", rating: 8 }],
+        // 封面墙的数量下限是 3——少于三张就不成其为墙
+        data: movies(4),
         intentClass: "browse",
         expectComponents: ["MovieGrid", "MovieList"],
         expectActions: ["setFilter"],
@@ -100,9 +97,9 @@ describe("runEval 编译指标", () => {
 
     expect(report.gaps).toBe(1);
     expect(report.degraded).toBe(0);
-    // 第一例 2 个组件候选（Grid/List；Comparison 因 maxItems=5 出局、
-    // EmptyState 因 maxItems=0 出局），第二例标量 0 个
-    expect(report.avgComponentCandidates).toBe(1);
+    // 第一例 3 个组件候选（Grid/List/Carousel；Comparison 因 maxItems=5 出局、
+    // EmptyState 因 maxItems=0 出局、详情类因基数不匹配出局），第二例标量 0 个
+    expect(report.avgComponentCandidates).toBe(1.5);
   });
 });
 
@@ -122,8 +119,8 @@ describe("runEval 报告诚实性", () => {
     });
 
     expect(report.hits).toBe(1);
-    // MovieGrid + MovieList，不该被 L0 的 0 稀释成 1
-    expect(report.avgComponentCandidates).toBe(2);
+    // Grid + List + Carousel，不该被 L0 的 0 稀释成 1.5
+    expect(report.avgComponentCandidates).toBe(3);
   });
 
   test("报告区分用例数与不同意图数", async () => {

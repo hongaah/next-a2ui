@@ -224,3 +224,37 @@ describe("assertNoDrift", () => {
     expect(() => assertNoDrift(result)).toThrow(/MovieGrid.*data-prop-not-found.*items/s);
   });
 });
+
+describe("extractContracts 数量约束对齐", () => {
+  test("不落在分桶边界上的数量下限会报错，而不是静默失配", () => {
+    const result = extractContracts({
+      project: project(),
+      // 3 落在 2-5 桶中间：候选集要求约束完整覆盖分桶，minItems=3 永远无法满足
+      declarations: [{ ...gridDeclaration, cardinality: { min: 3 } }],
+    });
+
+    expect(result.contracts).toEqual([]);
+    expect(result.errors[0]).toMatchObject({
+      component: "MovieGrid",
+      kind: "cardinality-not-aligned",
+    });
+  });
+
+  test("报错信息给出可用的边界值", () => {
+    const result = extractContracts({
+      project: project(),
+      declarations: [{ ...gridDeclaration, cardinality: { max: 12 } }],
+    });
+
+    expect(result.errors[0]?.detail).toContain("20");
+  });
+
+  test("落在边界上的数量约束正常通过", () => {
+    const result = extractContracts({
+      project: project(),
+      declarations: [{ ...gridDeclaration, cardinality: { min: 2, max: 20 } }],
+    });
+
+    expect(result.errors).toEqual([]);
+  });
+});
