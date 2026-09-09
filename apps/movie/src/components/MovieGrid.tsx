@@ -17,7 +17,9 @@ export function MovieGrid({ movies, onSelect }: MovieGridProps) {
       {movies.map((movie) => (
         <li key={movie.id}>
           <button type="button" onClick={() => onSelect?.(movie.id)}>
-            <img src={movie.poster} alt={movie.title} />
+            <span aria-hidden style={{ fontSize: 34 }}>
+              {movie.poster}
+            </span>
             <span>{movie.title}</span>
           </button>
         </li>

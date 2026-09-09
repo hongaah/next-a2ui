@@ -5,13 +5,28 @@
   "type": "module",
   "dependencies": {
     "react": "^19.2.0",
-    "@next-a2ui/contract": "workspace:*",
-    "@next-a2ui/core": "workspace:*"
+    "@next-a2ui/core": "workspace:*",
+    "@next-a2ui/adapter": "workspace:*",
+    "@next-a2ui/llm": "workspace:*",
+    "@next-a2ui/runtime": "workspace:*",
+    "next": "^15.5.0",
+    "react-dom": "^19.2.0",
+    "ai": "^5.0.0",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@types/react": "^19.2.0"
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.14.1"
   },
   "exports": {
     "./src/*": "./src/*"
+  },
+  "scripts": {
+    "catalog": "bun run ../../scripts/build-catalog.ts",
+    "dev": "bun run catalog && next dev -p 3210",
+    "build": "bun run catalog && next build",
+    "start": "next start -p 3210"
   }
 }

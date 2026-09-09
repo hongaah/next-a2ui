@@ -8,7 +8,9 @@ export interface MovieDetailProps {
 
 export const MovieDetail = ({ movie, onPlay, onAddToWatchlist }: MovieDetailProps) => (
   <article className="movie-detail">
-    <img src={movie.poster} alt={movie.title} />
+    <div aria-hidden style={{ fontSize: 48 }}>
+      {movie.poster}
+    </div>
     <h1>{movie.title}</h1>
     <p>{movie.synopsis}</p>
     <button type="button" onClick={onPlay}>

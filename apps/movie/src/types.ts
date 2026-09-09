@@ -4,6 +4,7 @@ export interface Movie {
   poster: string;
   rating: number;
   year: number;
+  genre: string;
 }
 
 export interface MovieFull extends Movie {

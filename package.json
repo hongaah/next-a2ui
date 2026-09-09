@@ -12,8 +12,9 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "eval": "bun run packages/eval/src/cli.ts",
-    "verify": "bun run typecheck && bun run lint && bun test && bun run eval",
-    "smoke": "bun run scripts/smoke.tsx"
+    "verify": "bun run catalog && bun run typecheck && bun run lint && bun test && bun run eval",
+    "smoke": "bun run scripts/smoke.tsx",
+    "catalog": "bun run scripts/build-catalog.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
@@ -28,6 +29,7 @@
     "@next-a2ui/runtime": "workspace:*",
     "@next-a2ui/movie": "workspace:*",
     "react-dom": "^19.2.0",
-    "react": "^19.2.0"
+    "react": "^19.2.0",
+    "@next-a2ui/contract": "workspace:*"
   }
 }
