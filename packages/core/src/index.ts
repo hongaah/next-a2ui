@@ -27,6 +27,7 @@ export {
 export type { ComponentContract, JsonSchema, SemanticEvent } from "./contract.ts";
 export { dataShape, describeShape, type ShapeDescriptor, serializeShape } from "./data-shape.ts";
 export { Singleflight } from "./singleflight.ts";
+export type { A2UIComponent, SurfaceTemplate } from "./surface.ts";
 export {
   type CompileEvent,
   type InteractionEvent,
