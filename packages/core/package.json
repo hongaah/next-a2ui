@@ -1,0 +1,12 @@
+{
+  "name": "@next-a2ui/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.1.13"
+  }
+}
