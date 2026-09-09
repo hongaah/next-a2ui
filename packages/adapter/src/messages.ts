@@ -1,4 +1,4 @@
-import type { CompileResult } from "@next-a2ui/core";
+import type { A2UIComponent, CompileResult, SurfaceTemplate } from "@next-a2ui/core";
 
 export type A2UIMessage = Record<string, unknown>;
 
@@ -11,6 +11,67 @@ export interface MessageOptions {
 }
 
 const VERSION = "v1.0";
+const ROOT_ID = "root";
+
+/**
+ * A2UI 的根数据模型必须是**对象**，不能直接是数组。tool 结果因此统一挂在
+ * 这个键下面，内部的根路径 `/` 相应翻译成 `/data`。
+ */
+const DATA_ROOT = "data";
+
+function toWirePath(path: string): string {
+  if (!path.startsWith("/")) return path; // 子作用域路径原样保留
+  return path === "/" ? `/${DATA_ROOT}` : `/${DATA_ROOT}${path}`;
+}
+
+/**
+ * 把内部 IR 的组件翻译成线格式。
+ *
+ * A2UI 把绑定**内联成组件的属性**——`bindings` 子对象是我们的内部结构，
+ * 规范的 unevaluatedProperties 会直接拒收它。
+ */
+function toWireComponent(node: A2UIComponent): Record<string, unknown> {
+  const { bindings, ...rest } = node;
+  const inlined: Record<string, unknown> = { ...rest };
+  for (const [prop, binding] of Object.entries(bindings ?? {})) {
+    inlined[prop] = { path: toWirePath(binding.path) };
+  }
+  return inlined;
+}
+
+function renameIds(
+  components: readonly A2UIComponent[],
+  mapping: ReadonlyMap<string, string>,
+): A2UIComponent[] {
+  return components.map((node) => {
+    const id = mapping.get(node.id) ?? node.id;
+    const children = node.children?.map((child) => mapping.get(child) ?? child);
+    return { ...node, id, ...(children === undefined ? {} : { children }) };
+  });
+}
+
+/**
+ * A2UI v1.0 强制要求组件列表里有一个 id 为 `root` 的节点作为树根——
+ * `rootId` 只是我们的内部概念，线格式里并不存在这个字段。
+ *
+ * 因此发线之前必须把推导出的根节点改名为 `root`，并同步改写所有指向它的
+ * children 引用。若已有别的节点占着这个 id，先把它让开，否则会撞成同一个节点。
+ */
+function normalizeRoot(surface: SurfaceTemplate): A2UIComponent[] {
+  if (surface.rootId === ROOT_ID) return [...surface.components];
+
+  const mapping = new Map<string, string>();
+  const occupied = surface.components.some((node) => node.id === ROOT_ID);
+  if (occupied) {
+    const taken = new Set(surface.components.map((node) => node.id));
+    let renamed = `${ROOT_ID}-1`;
+    for (let i = 2; taken.has(renamed); i += 1) renamed = `${ROOT_ID}-${i}`;
+    mapping.set(ROOT_ID, renamed);
+  }
+  mapping.set(surface.rootId, ROOT_ID);
+
+  return renameIds(surface.components, mapping);
+}
 
 /**
  * 把编译产物翻译成 A2UI 线格式。
@@ -26,7 +87,11 @@ export function toA2UIMessages(result: CompileResult, options: MessageOptions): 
     return [
       {
         version: VERSION,
-        updateDataModel: { surfaceId: options.surfaceId, path: "/", value: options.data },
+        updateDataModel: {
+          surfaceId: options.surfaceId,
+          path: `/${DATA_ROOT}`,
+          value: options.data,
+        },
       },
     ];
   }
@@ -37,8 +102,8 @@ export function toA2UIMessages(result: CompileResult, options: MessageOptions): 
       createSurface: {
         surfaceId: options.surfaceId,
         catalogId: options.catalogId,
-        components: result.surface.components,
-        dataModel: options.data,
+        components: normalizeRoot(result.surface).map(toWireComponent),
+        dataModel: { [DATA_ROOT]: options.data },
       },
     },
   ];

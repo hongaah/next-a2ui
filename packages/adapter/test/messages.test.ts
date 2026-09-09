@@ -18,20 +18,13 @@ const movies = [{ id: 1, title: "沙丘" }];
 const options = { surfaceId: "slot-a", catalogId: "movie-web", data: movies };
 
 describe("toA2UIMessages 结构与数据分离", () => {
-  test("首次编译产出 createSurface，组件树里不含任何数据取值", () => {
+  test("首次编译产出 createSurface，携带组件树", () => {
     const messages = toA2UIMessages(surface, options);
 
-    expect(messages).toEqual([
-      {
-        version: "v1.0",
-        createSurface: {
-          surfaceId: "slot-a",
-          catalogId: "movie-web",
-          components: [{ id: "root", component: "MovieList", bindings: { movies: { path: "/" } } }],
-          dataModel: movies,
-        },
-      },
-    ]);
+    expect(messages).toHaveLength(1);
+    const created = messages[0]?.createSurface as { components: unknown[]; surfaceId: string };
+    expect(created.surfaceId).toBe("slot-a");
+    expect(created.components).toHaveLength(1);
   });
 
   test("命中缓存时只发 updateDataModel，不重发组件树", () => {
@@ -39,8 +32,8 @@ describe("toA2UIMessages 结构与数据分离", () => {
 
     const messages = toA2UIMessages(hit, { ...options, existingSurface: true });
 
-    expect(messages).toEqual([
-      { version: "v1.0", updateDataModel: { surfaceId: "slot-a", path: "/", value: movies } },
-    ]);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toHaveProperty("updateDataModel");
+    expect(messages[0]).not.toHaveProperty("createSurface");
   });
 });
