@@ -1,0 +1,15 @@
+{
+  "name": "@next-a2ui/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@a2ui/react": "^0.11.0",
+    "@a2ui/web_core": "^0.10.7",
+    "@next-a2ui/core": "workspace:*",
+    "react": "^19.2.0"
+  }
+}
