@@ -1,3 +1,8 @@
+export type ShapeDescriptor =
+  | { readonly kind: "array"; readonly lengthBucket: string; readonly fields: readonly string[] }
+  | { readonly kind: "object"; readonly fields: readonly string[] }
+  | { readonly kind: "scalar"; readonly type: string };
+
 /**
  * 长度分桶。基数是 UI 结构的强信号——空态、单条、短列表、长列表是四种不同的界面——
  * 但精确长度不是：11 条和 12 条必须共用同一个缓存条目，否则命中率会崩。
@@ -38,18 +43,37 @@ function guaranteedFields(items: readonly unknown[]): string[] {
 }
 
 /**
- * 从一次 tool 返回值推导结构指纹。
+ * 从一次 tool 返回值推导结构描述。
  *
  * 记录基数与字段集合，**绝不记录取值**——取值属于 dataModel，由运行时绑定，
  * 不参与缓存键。否则每个业务对象都会占一个缓存条目（Google async A2UI 的做法）。
  */
-export function dataShape(value: unknown): string {
+export function describeShape(value: unknown): ShapeDescriptor {
   if (Array.isArray(value)) {
-    const fields = guaranteedFields(value).join(",");
-    return `array:len=${lengthBucket(value.length)}:fields=${fields}`;
+    return {
+      kind: "array",
+      lengthBucket: lengthBucket(value.length),
+      fields: guaranteedFields(value),
+    };
   }
   if (isPlainObject(value)) {
-    return `object:fields=${Object.keys(value).sort().join(",")}`;
+    return { kind: "object", fields: Object.keys(value).sort() };
   }
-  return `scalar:${value === null ? "null" : typeof value}`;
+  return { kind: "scalar", type: value === null ? "null" : typeof value };
+}
+
+/** 结构描述的稳定序列化，用作缓存键的一维。 */
+export function serializeShape(shape: ShapeDescriptor): string {
+  switch (shape.kind) {
+    case "array":
+      return `array:len=${shape.lengthBucket}:fields=${shape.fields.join(",")}`;
+    case "object":
+      return `object:fields=${shape.fields.join(",")}`;
+    case "scalar":
+      return `scalar:${shape.type}`;
+  }
+}
+
+export function dataShape(value: unknown): string {
+  return serializeShape(describeShape(value));
 }
