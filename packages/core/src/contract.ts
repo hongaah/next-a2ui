@@ -4,6 +4,8 @@ export interface JsonSchema {
   readonly required?: readonly string[];
   readonly properties?: Readonly<Record<string, JsonSchema>>;
   readonly items?: JsonSchema;
+  readonly minItems?: number;
+  readonly maxItems?: number;
 }
 
 export interface SemanticEvent {

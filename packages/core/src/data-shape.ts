@@ -1,5 +1,11 @@
 export type ShapeDescriptor =
-  | { readonly kind: "array"; readonly lengthBucket: string; readonly fields: readonly string[] }
+  | {
+      readonly kind: "array";
+      readonly lengthBucket: string;
+      /** 该分桶覆盖的长度区间（闭区间，上界可为 Infinity）。 */
+      readonly lengthRange: readonly [number, number];
+      readonly fields: readonly string[];
+    }
   | { readonly kind: "object"; readonly fields: readonly string[] }
   | { readonly kind: "scalar"; readonly type: string };
 
@@ -7,13 +13,21 @@ export type ShapeDescriptor =
  * 长度分桶。基数是 UI 结构的强信号——空态、单条、短列表、长列表是四种不同的界面——
  * 但精确长度不是：11 条和 12 条必须共用同一个缓存条目，否则命中率会崩。
  */
-function lengthBucket(length: number): string {
-  if (length === 0) return "0";
-  if (length === 1) return "1";
-  if (length <= 5) return "2-5";
-  if (length <= 20) return "6-20";
-  if (length <= 100) return "21-100";
-  return "100+";
+const BUCKETS: ReadonlyArray<{ label: string; range: readonly [number, number] }> = [
+  { label: "0", range: [0, 0] },
+  { label: "1", range: [1, 1] },
+  { label: "2-5", range: [2, 5] },
+  { label: "6-20", range: [6, 20] },
+  { label: "21-100", range: [21, 100] },
+  { label: "100+", range: [101, Number.POSITIVE_INFINITY] },
+];
+
+function lengthBucket(length: number): { label: string; range: readonly [number, number] } {
+  for (const bucket of BUCKETS) {
+    if (length <= bucket.range[1]) return bucket;
+  }
+  // BUCKETS 最后一档上界是 Infinity，循环必定命中
+  throw new Error(`无法为长度 ${length} 分桶`);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -50,9 +64,11 @@ function guaranteedFields(items: readonly unknown[]): string[] {
  */
 export function describeShape(value: unknown): ShapeDescriptor {
   if (Array.isArray(value)) {
+    const bucket = lengthBucket(value.length);
     return {
       kind: "array",
-      lengthBucket: lengthBucket(value.length),
+      lengthBucket: bucket.label,
+      lengthRange: bucket.range,
       fields: guaranteedFields(value),
     };
   }

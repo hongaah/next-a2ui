@@ -7,13 +7,33 @@ function coversFields(required: readonly string[], available: readonly string[])
 }
 
 /**
+ * 组件的数量约束必须**完整覆盖**数据所在的分桶。
+ *
+ * 取覆盖而非相交是有意的：桶内任一长度都必须能安全渲染。maxItems=5 的对比
+ * 组件遇到 6-20 桶就该出局——哪怕这次恰好只有 6 条。空态组件（maxItems=0）
+ * 因此也只会匹配空列表。
+ *
+ * 这条约束原本只活在 semantics 的散文里（"超过 5 条不要用"），只有模型看得到
+ * 且不可靠；搬进类型系统后它是被执行的，且不花一个 token。
+ */
+function coversLength(accepts: JsonSchema, range: readonly [number, number]): boolean {
+  const min = accepts.minItems ?? 0;
+  const max = accepts.maxItems ?? Number.POSITIVE_INFINITY;
+  return range[0] >= min && range[1] <= max;
+}
+
+/**
  * 基数必须先匹配：详情组件不能拿去渲染列表，列表组件也不能渲染单个对象。
  * 这是「详情 vs 列表」在类型层面的体现。
  */
 function isCompatible(accepts: JsonSchema, shape: ShapeDescriptor): boolean {
   switch (shape.kind) {
     case "array":
-      return accepts.type === "array" && coversFields(accepts.items?.required ?? [], shape.fields);
+      return (
+        accepts.type === "array" &&
+        coversLength(accepts, shape.lengthRange) &&
+        coversFields(accepts.items?.required ?? [], shape.fields)
+      );
     case "object":
       return accepts.type === "object" && coversFields(accepts.required ?? [], shape.fields);
     case "scalar":

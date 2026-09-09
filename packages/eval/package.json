@@ -1,0 +1,12 @@
+{
+  "name": "@next-a2ui/eval",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@next-a2ui/core": "workspace:*"
+  }
+}
