@@ -1,3 +1,4 @@
+import type { ActionContract } from "./action.ts";
 import type { ComponentContract, JsonSchema } from "./contract.ts";
 import type { ShapeDescriptor } from "./data-shape.ts";
 
@@ -32,4 +33,17 @@ export function candidates(
   shape: ShapeDescriptor,
 ): ComponentContract[] {
   return catalog.filter((component) => isCompatible(component.accepts, shape));
+}
+
+/**
+ * 由 tool 实参静态算出可以驱动的动作。
+ *
+ * 与组件候选集同一招：动作的必需参数必须能从 agent 本次调用的实参里取到，
+ * 否则该动作根本没法被正确填参，不该交给模型排序。
+ */
+export function actionCandidates(
+  actions: readonly ActionContract[],
+  availableArgs: readonly string[],
+): ActionContract[] {
+  return actions.filter((action) => coversFields(action.params.required ?? [], availableArgs));
 }

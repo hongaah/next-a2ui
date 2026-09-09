@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { ActionPlan } from "../src/action.ts";
 import { MemoryCacheStore } from "../src/cache-store.ts";
 import { type Catalog, Compiler, type ComposeInput, type LLMClient } from "../src/compiler.ts";
 import type { ComponentContract } from "../src/contract.ts";
@@ -16,6 +17,10 @@ const catalog: Catalog = { id: "movie-web", version: "1.0.0", components: [movie
 
 class CountingLLM implements LLMClient {
   calls: ComposeInput[] = [];
+
+  async planActions(): Promise<readonly ActionPlan[]> {
+    return [];
+  }
 
   async composeSurface(input: ComposeInput): Promise<SurfaceTemplate> {
     this.calls.push(input);
@@ -70,6 +75,10 @@ describe("Compiler capability gap", () => {
 class InvalidLLM implements LLMClient {
   calls = 0;
 
+  async planActions(): Promise<readonly ActionPlan[]> {
+    return [];
+  }
+
   async composeSurface(): Promise<SurfaceTemplate> {
     this.calls += 1;
     // catalog 里没有 TimelineChart
@@ -107,6 +116,7 @@ describe("Compiler 降级", () => {
   test("模型调用失败时返回降级结果而不是抛异常", async () => {
     const failing: LLMClient = {
       composeSurface: () => Promise.reject(new Error("模型超时")),
+      planActions: async () => [],
     };
     const compiler = new Compiler({ cache: new MemoryCacheStore(), llm: failing });
 
@@ -125,6 +135,7 @@ describe("Compiler 降级", () => {
         if (attempts === 1) throw new Error("模型超时");
         return { rootId: "root", components: [{ id: "root", component: "MovieRow" }] };
       },
+      planActions: async () => [],
     };
     const compiler = new Compiler({ cache: new MemoryCacheStore(), llm: flaky });
 

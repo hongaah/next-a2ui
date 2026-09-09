@@ -1,6 +1,12 @@
+export type {
+  ActionContract,
+  ActionInvocation,
+  ActionPlan,
+} from "./action.ts";
+export { bindActionPlan } from "./bind-action.ts";
 export { type CacheKeyInput, cacheKeyOf, type IntentClass } from "./cache-key.ts";
-export { type CachedTemplate, type CacheStore, MemoryCacheStore } from "./cache-store.ts";
-export { candidates } from "./candidates.ts";
+export { type CachedPlan, type CacheStore, MemoryCacheStore } from "./cache-store.ts";
+export { actionCandidates, candidates } from "./candidates.ts";
 export {
   type CapabilityGap,
   type Catalog,
@@ -10,6 +16,7 @@ export {
   type ComposeInput,
   type DegradeReason,
   type LLMClient,
+  type PlanActionsInput,
 } from "./compiler.ts";
 export type { ComponentContract, JsonSchema, SemanticEvent } from "./contract.ts";
 export { dataShape, describeShape, type ShapeDescriptor, serializeShape } from "./data-shape.ts";

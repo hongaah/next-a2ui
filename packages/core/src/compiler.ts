@@ -1,6 +1,8 @@
+import type { ActionContract, ActionInvocation, ActionPlan } from "./action.ts";
+import { bindActionPlan } from "./bind-action.ts";
 import { cacheKeyOf, type IntentClass } from "./cache-key.ts";
-import type { CacheStore } from "./cache-store.ts";
-import { candidates } from "./candidates.ts";
+import type { CachedPlan, CacheStore } from "./cache-store.ts";
+import { actionCandidates, candidates } from "./candidates.ts";
 import type { ComponentContract } from "./contract.ts";
 import { describeShape, type ShapeDescriptor, serializeShape } from "./data-shape.ts";
 import { Singleflight } from "./singleflight.ts";
@@ -12,6 +14,7 @@ export interface Catalog {
   readonly id: string;
   readonly version: string;
   readonly components: readonly ComponentContract[];
+  readonly actions?: readonly ActionContract[];
 }
 
 export interface ComposeInput {
@@ -20,9 +23,16 @@ export interface ComposeInput {
   readonly intentClass: IntentClass;
 }
 
+export interface PlanActionsInput {
+  readonly candidates: readonly ActionContract[];
+  readonly availableArgs: readonly string[];
+  readonly intentClass: IntentClass;
+}
+
 /** core 不绑定任何 provider SDK，LLM 能力由构造时注入。 */
 export interface LLMClient {
   composeSurface(input: ComposeInput): Promise<SurfaceTemplate>;
+  planActions(input: PlanActionsInput): Promise<readonly ActionPlan[]>;
 }
 
 export interface CompileRequest {
@@ -50,12 +60,19 @@ export type DegradeReason =
   | { readonly stage: "compile-error"; readonly message: string };
 
 export interface CompileResult {
+  /** 阶梯 1：驱动宿主现有 UI 的动作。 */
+  readonly actions: readonly ActionInvocation[];
+  /** 阶梯 2+：生成的界面。action-only 场景下为 null。 */
   readonly surface: SurfaceTemplate | null;
   readonly source: "L0" | "L2" | "gap" | "fallback";
   readonly templateId: string | null;
   readonly capabilityGap: CapabilityGap | null;
   readonly degraded: DegradeReason | null;
 }
+
+type Outcome =
+  | { readonly ok: true; readonly entry: CachedPlan }
+  | { readonly ok: false; readonly errors: readonly ValidationError[] };
 
 export class Compiler {
   readonly #cache: CacheStore;
@@ -81,20 +98,19 @@ export class Compiler {
 
     const cached = await this.#cache.get(key);
     if (cached !== undefined) {
-      return {
-        surface: cached.template,
-        source: "L0",
-        templateId: cached.templateId,
-        capabilityGap: null,
-        degraded: null,
-      };
+      return this.#succeed(cached, request, "L0");
     }
 
-    // 候选集必须先算：为空说明 catalog 拿不下这份数据，此时调用模型纯属浪费——
-    // 它只会编出引用不存在组件的产物。直接上报 gap。
-    const matched = candidates(request.catalog.components, shape);
-    if (matched.length === 0) {
+    // 候选集必须先算：为空说明 catalog 既拿不下这份数据、也没有可驱动的动作，
+    // 此时调用模型纯属浪费——它只会编出引用不存在组件的产物。直接上报 gap。
+    const availableArgs = Object.keys(request.toolCall.args);
+    const componentMatches = candidates(request.catalog.components, shape);
+    const actionMatches = actionCandidates(request.catalog.actions ?? [], availableArgs);
+
+    // 组件无候选但动作有候选是 action-only 场景（阶梯 1），不是 gap。
+    if (componentMatches.length === 0 && actionMatches.length === 0) {
       return {
+        actions: [],
         surface: null,
         source: "gap",
         templateId: null,
@@ -109,35 +125,43 @@ export class Compiler {
     }
 
     // 未命中走 L2，并在 singleflight 保护下编译：同一 key 的并发请求只付一次钱。
-    type Outcome =
-      | { ok: true; entry: { templateId: string; template: SurfaceTemplate } }
-      | { ok: false; errors: readonly ValidationError[] };
-
     let outcome: Outcome;
     try {
       outcome = await this.#singleflight.run<Outcome>(key, async () => {
-        const template = await this.#llm.composeSurface({
-          candidates: matched,
-          shape,
-          intentClass: request.intentClass,
-        });
+        const [template, actionPlans] = await Promise.all([
+          componentMatches.length === 0
+            ? null
+            : this.#llm.composeSurface({
+                candidates: componentMatches,
+                shape,
+                intentClass: request.intentClass,
+              }),
+          actionMatches.length === 0
+            ? []
+            : this.#llm.planActions({
+                candidates: actionMatches,
+                availableArgs,
+                intentClass: request.intentClass,
+              }),
+        ]);
 
         // 验证不通过绝不入缓存：一次坏产物若被晋升，会在这个 key 上被永久复用。
-        const errors = validateTemplate(template, {
-          components: request.catalog.components,
-          shape,
-        });
-        if (errors.length > 0) return { ok: false as const, errors };
+        const errors =
+          template === null
+            ? []
+            : validateTemplate(template, { components: request.catalog.components, shape });
+        if (errors.length > 0) return { ok: false, errors };
 
-        const entry = { templateId: key, template };
+        const entry: CachedPlan = { templateId: key, template, actionPlans };
         // JIT 晋升：L2 产物回写 L0，下次同意图即 0 次模型调用。
         await this.#cache.set(key, entry);
-        return { ok: true as const, entry };
+        return { ok: true, entry };
       });
     } catch (error) {
       // compile 永不抛出：一个 slot 编译失败不能让宿主页面挂掉。
       // 失败不写缓存，所以下一次请求会自然重试。
       return {
+        actions: [],
         surface: null,
         source: "fallback",
         templateId: null,
@@ -151,6 +175,7 @@ export class Compiler {
 
     if (!outcome.ok) {
       return {
+        actions: [],
         surface: null,
         source: "fallback",
         templateId: null,
@@ -159,10 +184,31 @@ export class Compiler {
       };
     }
 
+    return this.#succeed(outcome.entry, request, "L2");
+  }
+
+  /**
+   * 动作参数在**每一次**编译时重新绑定，缓存里存的只是无实参的计划。
+   * 因此同一个缓存条目可以服务不同的参数：命中 L0 时参数依然来自本次
+   * tool 调用，永远与 agent 的意图一致，且不花一个 token。
+   */
+  #succeed(entry: CachedPlan, request: CompileRequest, source: "L0" | "L2"): CompileResult {
+    const contracts = new Map(
+      (request.catalog.actions ?? []).map((action) => [action.id, action] as const),
+    );
+    const actions: ActionInvocation[] = [];
+    for (const plan of entry.actionPlans) {
+      const contract = contracts.get(plan.actionId);
+      if (contract !== undefined) {
+        actions.push(bindActionPlan(plan, contract, request.toolCall.args));
+      }
+    }
+
     return {
-      surface: outcome.entry.template,
-      source: "L2",
-      templateId: outcome.entry.templateId,
+      actions,
+      surface: entry.template,
+      source,
+      templateId: entry.templateId,
       capabilityGap: null,
       degraded: null,
     };
