@@ -95,3 +95,43 @@ describe("Compiler 产物验证", () => {
     expect(second.surface).toBeNull();
   });
 });
+
+describe("Compiler 降级", () => {
+  const request = {
+    toolCall: { name: "getMovies", args: { genre: "sci-fi" } },
+    data: movies(12),
+    intentClass: "browse" as const,
+    catalog,
+  };
+
+  test("模型调用失败时返回降级结果而不是抛异常", async () => {
+    const failing: LLMClient = {
+      composeSurface: () => Promise.reject(new Error("模型超时")),
+    };
+    const compiler = new Compiler({ cache: new MemoryCacheStore(), llm: failing });
+
+    const result = await compiler.compile(request);
+
+    expect(result.source).toBe("fallback");
+    expect(result.surface).toBeNull();
+    expect(result.degraded).toMatchObject({ stage: "compile-error", message: "模型超时" });
+  });
+
+  test("编译失败后，同 key 的下一次请求仍会重试", async () => {
+    let attempts = 0;
+    const flaky: LLMClient = {
+      composeSurface: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("模型超时");
+        return { rootId: "root", components: [{ id: "root", component: "MovieRow" }] };
+      },
+    };
+    const compiler = new Compiler({ cache: new MemoryCacheStore(), llm: flaky });
+
+    const first = await compiler.compile(request);
+    const second = await compiler.compile(request);
+
+    expect(first.source).toBe("fallback");
+    expect(second.source).toBe("L2");
+  });
+});

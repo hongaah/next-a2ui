@@ -45,10 +45,9 @@ export interface CapabilityGap {
   readonly intentClass: IntentClass;
 }
 
-export interface DegradeReason {
-  readonly stage: "validation";
-  readonly errors: readonly ValidationError[];
-}
+export type DegradeReason =
+  | { readonly stage: "validation"; readonly errors: readonly ValidationError[] }
+  | { readonly stage: "compile-error"; readonly message: string };
 
 export interface CompileResult {
   readonly surface: SurfaceTemplate | null;
@@ -110,25 +109,45 @@ export class Compiler {
     }
 
     // 未命中走 L2，并在 singleflight 保护下编译：同一 key 的并发请求只付一次钱。
-    const outcome = await this.#singleflight.run(key, async () => {
-      const template = await this.#llm.composeSurface({
-        candidates: matched,
-        shape,
-        intentClass: request.intentClass,
-      });
+    type Outcome =
+      | { ok: true; entry: { templateId: string; template: SurfaceTemplate } }
+      | { ok: false; errors: readonly ValidationError[] };
 
-      // 验证不通过绝不入缓存：一次坏产物若被晋升，会在这个 key 上被永久复用。
-      const errors = validateTemplate(template, {
-        components: request.catalog.components,
-        shape,
-      });
-      if (errors.length > 0) return { ok: false as const, errors };
+    let outcome: Outcome;
+    try {
+      outcome = await this.#singleflight.run<Outcome>(key, async () => {
+        const template = await this.#llm.composeSurface({
+          candidates: matched,
+          shape,
+          intentClass: request.intentClass,
+        });
 
-      const entry = { templateId: key, template };
-      // JIT 晋升：L2 产物回写 L0，下次同意图即 0 次模型调用。
-      await this.#cache.set(key, entry);
-      return { ok: true as const, entry };
-    });
+        // 验证不通过绝不入缓存：一次坏产物若被晋升，会在这个 key 上被永久复用。
+        const errors = validateTemplate(template, {
+          components: request.catalog.components,
+          shape,
+        });
+        if (errors.length > 0) return { ok: false as const, errors };
+
+        const entry = { templateId: key, template };
+        // JIT 晋升：L2 产物回写 L0，下次同意图即 0 次模型调用。
+        await this.#cache.set(key, entry);
+        return { ok: true as const, entry };
+      });
+    } catch (error) {
+      // compile 永不抛出：一个 slot 编译失败不能让宿主页面挂掉。
+      // 失败不写缓存，所以下一次请求会自然重试。
+      return {
+        surface: null,
+        source: "fallback",
+        templateId: null,
+        capabilityGap: null,
+        degraded: {
+          stage: "compile-error",
+          message: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
 
     if (!outcome.ok) {
       return {
